@@ -174,3 +174,19 @@ harness = HarnessConfig(
 `Fabric.check()` supports `live`, `active`, and `ready`. The adapter checks native agent and database ownership, the initialized invocation interface, and a fresh `get_activity_summary()` diagnostic response.
 
 Refer to the [SDK health-check overview](../../sdk/health-checks.mdx) for shared behavior and a comparison of native evidence across adapters.
+
+## Open the Native Terminal UI
+
+Set `interfaces.terminal` to `{}` to offer the stock Hermes TUI, or set its `enabled` field to `false` to leave it off. It has no HTTP port. This requires Hermes's built TUI bundle and Node, a POSIX host, and a terminal supporting Unix file-descriptor transfer. API and dashboard interfaces remain optional.
+
+The executable `interfaces/terminal` is under the runtime's Hermes home. With `runtime.keep_state`, that is the agent's retained state directory; otherwise it is `<artifact root>/.fabric/hermes/runtimes/<runtime-id>`. Run the launcher through your sandbox provider's terminal exec, for example:
+
+```sh
+openshell sandbox exec -n assistant --tty -- /path/to/hermes/home/interfaces/terminal
+```
+
+Use the printed path from the consumer. The launcher contains no model keys. It transfers the terminal's descriptors to the adapter, which starts native `hermes --tui` with the runtime's environment and workspace. The TUI uses native session creation and selection; `--resume SESSION` is forwarded to Hermes. It shares configuration, skills, plugins, and persisted state with the runtime, but does not attach automatically to Fabric's embedded conversation.
+
+The adapter starts a foreground native gateway and verifies its ownership before publishing the launcher. It refuses to attach to an existing gateway owner. Closing the TUI normally does not stop the gateway or promise cancellation of native work. Runtime stop removes terminal admission, attempts to close owned viewers, and then stops its gateway and other interface children.
+
+**Lifecycle qualification is incomplete.** Native TUI recovery can create a replacement gateway, native workers can outlast the supervisor's stop budget, and OpenShell can deny process-group signals. This implementation does not establish that every owned native turn, tool, or inference request ends before Fabric reports stop. [NemoClaw #14202](https://github.com/NVIDIA/NemoClaw/issues/14202) tracks that unresolved contract. A successful terminal launch or direct-child exit is not full lifecycle qualification. Test this candidate only in an isolated disposable sandbox, preserve persisted state evidence, and verify whole-sandbox cleanup independently of the runtime-stop assertion.

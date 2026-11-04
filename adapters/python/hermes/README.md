@@ -149,3 +149,9 @@ model, skills, MCP, tools, telemetry, and runtime behavior through complete
 typed `FabricConfig` values and ordinary Python composition. The adapter
 descriptor describes adapter capabilities; it is not an agent configuration.
 Add descriptor fields only when NeMo Fabric core or the SDK actually uses them.
+
+### Native terminal UI (experimental)
+
+Set `harness.settings.interfaces.terminal` to `{}` to publish the executable `interfaces/terminal` in the runtime's Hermes home. It requires a PTY, Node, and Hermes's built TUI bundle; no port is required. Use the launcher through sandbox exec to retain the runtime's configuration, workspace, and persisted sessions. Native session creation and `--resume SESSION` remain available.
+
+The adapter owns the viewer children and starts a foreground native gateway. Full native-work shutdown remains unqualified: gateway recovery, worker stop budgets, and OpenShell's signal restrictions are tracked in [NemoClaw #14202](https://github.com/NVIDIA/NemoClaw/issues/14202). See [terminal UI behavior and limits](../../../docs/integrations/harness/hermes.mdx#open-the-native-terminal-ui) before testing this candidate. Normal quit does not prove runtime-stop cancellation.

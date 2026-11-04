@@ -59,6 +59,18 @@
       "interfaces": {
         "type": "object",
         "properties": {
+          "terminal": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Offer the native Hermes terminal UI. A present terminal is on unless this is false."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Experimental native TUI launcher at interfaces/terminal in the runtime's Hermes home. Shares configuration and persisted sessions; does not attach to the embedded Fabric conversation. Complete owned-work shutdown remains unqualified; see NVIDIA/NemoClaw#14202."
+          },
           "api": {
             "type": "object",
             "properties": {

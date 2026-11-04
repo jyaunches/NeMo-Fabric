@@ -108,6 +108,7 @@ class HermesRuntime:
             self._agent_config = agent_config
             self._settings = configuration._settings(agent_config)
             interface_ports = interfaces.interface_ports(self._settings)
+            terminal = interfaces.terminal_enabled(self._settings)
             model_config = configuration._selected_model(agent_config)
             self._model_config = model_config
             self._runtime_id = runtime_context.runtime_id
@@ -119,6 +120,8 @@ class HermesRuntime:
             # kept Hermes home, for a server that no longer runs.
             token_path = self._hermes_home / "interfaces" / "api.token"
             token_path.unlink(missing_ok=True)
+            for name in ("terminal", "terminal.running"):
+                (self._hermes_home / "interfaces" / name).unlink(missing_ok=True)
             os.environ["HOME"] = str(self._hermes_home)
             os.environ["HERMES_HOME"] = str(self._hermes_home)
             os.environ.setdefault("HERMES_YOLO_MODE", "1")
@@ -151,7 +154,7 @@ class HermesRuntime:
                 # Workspace belongs to the per-runtime context, not AgentConfig.
                 workspace=str(runtime_context.environment.workspace or "."),
                 relay_enabled=relay_enabled,
-                interfaces=interface_ports,
+                interfaces={**interface_ports, **({"terminal": 0} if terminal else {})},
             )
             api_key_env = configuration._api_key_env(model_config)
             api_key = os.environ.get(api_key_env)
@@ -229,7 +232,7 @@ class HermesRuntime:
                         session_db=self._session_db,
                     )
                 )
-            if interface_ports:
+            if interface_ports or terminal:
                 environment = dict(os.environ)
                 provider_key_env = configuration.PROVIDER_DEFAULT_API_KEY_ENV.get(
                     str(model_config.provider or "").lower()
@@ -248,6 +251,8 @@ class HermesRuntime:
                         0.0,
                     ),
                     environment=environment,
+                    terminal=terminal,
+                    workspace=str(runtime_context.environment.workspace or "."),
                 )
             self._agent_config = agent_config
             self._started = True
@@ -757,7 +762,6 @@ def filter_supported_call_kwargs(func: Any, **kwargs: Any) -> dict[str, Any]:
     signature = inspect.signature(func)
     supported = set(signature.parameters)
     return {key: value for key, value in kwargs.items() if key in supported}
-
 
 
 # Selected software reported by the shared lifecycle host; no dependency scan.

@@ -18,6 +18,7 @@ from typing import Any
 from nemo_fabric_adapters.common import lifecycle
 from nemo_fabric_adapters.common import local_interfaces
 from nemo_fabric_adapters.common import utils as common_utils
+from nemo_fabric_adapters.hermes.terminal import TerminalInterface
 
 HEALTH_PATHS = {"api": "/health", "dashboard": "/api/status"}
 # Children run in their own sessions and stop by process group.
@@ -30,6 +31,11 @@ STOP_GRACE_SECONDS = 5.0
 GATEWAY_DRAIN_TIMEOUT_SECONDS = 3
 
 
+def terminal_enabled(settings: dict[str, Any]) -> bool:
+    terminal = settings.get("interfaces", {}).get("terminal")
+    return terminal is not None and terminal.get("enabled", True)
+
+
 def interface_ports(settings: dict[str, Any]) -> dict[str, int]:
     """Return the enabled interfaces' loopback ports, keyed by interface name.
 
@@ -38,7 +44,7 @@ def interface_ports(settings: dict[str, Any]) -> dict[str, int]:
     return {
         name: interface["port"]
         for name, interface in settings.get("interfaces", {}).items()
-        if interface.get("enabled", True)
+        if name in HEALTH_PATHS and interface.get("enabled", True)
     }
 
 
@@ -62,6 +68,7 @@ class InterfaceChildren:
     def __init__(self) -> None:
         self._children: list[_Child] = []
         self._token_path: Path | None = None
+        self._terminal = TerminalInterface()
 
     async def start(
         self,
@@ -71,6 +78,8 @@ class InterfaceChildren:
         token_path: Path,
         timeout: float,
         environment: dict[str, str],
+        terminal: bool = False,
+        workspace: str = ".",
     ) -> None:
         """Start the enabled interfaces and write the API token once all pass health."""
         if not POSIX:
@@ -90,15 +99,26 @@ class InterfaceChildren:
                     },
                 )
         web_dist = _web_dist() if "dashboard" in ports else None
+        if terminal and await _gateway_identity(hermes_home) is not None:
+            raise lifecycle.LifecycleError(
+                "hermes_gateway_already_owned",
+                "Another gateway already owns this Hermes home; stop its owner before applying",
+            )
         token = secrets.token_urlsafe(32)
         log_dir = hermes_home / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         deadline = asyncio.get_running_loop().time() + timeout
         try:
-            for name, port in ports.items():
+            children = dict(ports)
+            if terminal and "api" not in ports:
+                children = {"gateway": 0, **children}
+            gateway = None
+            for name, port in children.items():
                 arguments, child_environment = _child_command(
                     name, port, token=token, web_dist=web_dist, environment=environment
                 )
+                if terminal and name == "api":
+                    arguments.append("--external-supervisor")
                 with open(log_dir / f"fabric-interface-{name}.log", "ab") as log:
                     process = await asyncio.create_subprocess_exec(
                         sys.executable,
@@ -112,8 +132,20 @@ class InterfaceChildren:
                         start_new_session=True,
                     )
                 self._children.append(_Child(name, port, process))
+                if name in {"api", "gateway"}:
+                    gateway = process
             for child in self._children:
-                await _wait_healthy(child, deadline)
+                if child.name != "gateway":
+                    await _wait_healthy(child, deadline)
+            if terminal:
+                await _wait_owned_gateway(gateway, hermes_home, deadline)
+                await self._terminal.start(
+                    hermes_home / "interfaces",
+                    command=[sys.executable, "-m", "hermes_cli.main", "--tui"],
+                    environment=environment,
+                    workspace=workspace,
+                    owner_alive=lambda: gateway.returncode is None,
+                )
             if "api" in ports:
                 local_interfaces.write_private_file(token_path, token)
                 self._token_path = token_path
@@ -126,6 +158,12 @@ class InterfaceChildren:
         token_path, self._token_path = self._token_path, None
         if token_path is not None:
             token_path.unlink(missing_ok=True)
+        # Withdraw admission and close viewers before stopping their gateway.
+        terminal_error = None
+        try:
+            await self._terminal.stop()
+        except BaseException as error:
+            terminal_error = error
         running = [
             child for child in self._children if child.process.returncode is None
         ]
@@ -145,6 +183,8 @@ class InterfaceChildren:
             self._children = []
         if pending:
             await asyncio.wait(pending)
+        if terminal_error is not None:
+            raise terminal_error
 
 
 def _web_dist() -> Path:
@@ -206,6 +246,8 @@ def _child_command(
             API_SERVER_PORT=str(port),
         )
         return ["gateway", "run"], child_environment
+    if name == "gateway":
+        return ["gateway", "run", "--external-supervisor"], child_environment
     child_environment["HERMES_WEB_DIST"] = str(web_dist)
     # --isolated keeps one dashboard per runtime instead of attaching to another
     # runtime's dashboard on this host.
@@ -219,6 +261,35 @@ def _child_command(
         "--skip-build",
         "--isolated",
     ], child_environment
+
+
+async def _gateway_identity(home: Path) -> dict[str, Any] | None:
+    from gateway.control_socket import identify_gateway
+
+    return await asyncio.to_thread(identify_gateway, home, timeout=0.5)
+
+
+async def _wait_owned_gateway(
+    process: asyncio.subprocess.Process, home: Path, deadline: float
+) -> None:
+    while asyncio.get_running_loop().time() < deadline:
+        if process.returncode is not None:
+            break
+        identity = await _gateway_identity(home)
+        if identity is not None:
+            if identity.get("pid") != process.pid or identity.get("hermes_home") != str(
+                home
+            ):
+                raise lifecycle.LifecycleError(
+                    "hermes_gateway_owner_mismatch",
+                    "The native gateway is not this runtime's child",
+                )
+            if identity.get("state") == "ready":
+                return
+        await asyncio.sleep(0.1)
+    raise lifecycle.LifecycleError(
+        "hermes_gateway_not_ready", "The owned native gateway did not become ready"
+    )
 
 
 async def _http_status(port: int, path: str) -> int | None:

@@ -889,6 +889,18 @@
                     "port"
                   ],
                   "type": "object"
+                },
+                "terminal": {
+                  "additionalProperties": false,
+                  "description": "Experimental native TUI launcher at interfaces/terminal in the runtime's Hermes home. Shares configuration and persisted sessions; does not attach to the embedded Fabric conversation. Complete owned-work shutdown remains unqualified; see NVIDIA/NemoClaw#14202.",
+                  "properties": {
+                    "enabled": {
+                      "default": true,
+                      "description": "Offer the native Hermes terminal UI. A present terminal is on unless this is false.",
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
                 }
               },
               "type": "object"
@@ -974,7 +986,7 @@
         "name": "nemo-fabric-adapters-hermes",
         "version": "0.7.0"
       },
-      "sha256": "4f5a4c237d9f1da355b1288d90b4749ac48ba67d14e795eab4e079ff917acc6e",
+      "sha256": "dbd2b7344c1662d469372ea7a1102644aebd4b658774573b5857709d8c5b7bc1",
       "source": "adapters/python/hermes/hermes.fabric-adapter.json"
     },
     "nvidia.fabric.kilo": {

@@ -102,7 +102,7 @@ def _interface(name: str, **fields: object) -> dict[str, object]:
 
 # Settings that the descriptor's schema rejects during planning.
 INVALID_SETTINGS = [
-    pytest.param(_interface("terminal"), id="unsupported"),
+    pytest.param(_interface("unknown"), id="unsupported"),
     pytest.param(_interface("api", port=8642, key="x"), id="unknown-field"),
     pytest.param(_interface("api"), id="missing-port"),
     pytest.param(_interface("dashboard", port=65_536), id="port-too-high"),
