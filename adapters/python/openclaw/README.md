@@ -55,7 +55,7 @@ Before migration, copy every legacy session directory while the Gateway is stopp
 
 Run `openclaw doctor --fix` with the 2026.9.34 executable and the same path settings. The command imports legacy `sessions.json` files and JSONL session data into each agent's SQLite database. Restart the Gateway after the command succeeds. Keep the verified backup for rollback.
 
-Managed runtimes and NeMo Fabric-owned services use temporary state directories, so each new Gateway starts with fresh state.
+Managed runtimes and NeMo Fabric-owned services use temporary state directories by default, so each new Gateway starts with fresh state. With `runtime.keep_state`, the Gateway's `OPENCLAW_STATE_DIR` is the agent's state folder, `<artifact root>/.fabric/state/nvidia.fabric.openclaw/<agent name>`, for every runtime of the agent; see [Keep OpenClaw State Across Runtimes](../../../docs/integrations/harness/openclaw.mdx#keep-openclaw-state-across-runtimes).
 
 ## Configuration
 
@@ -70,8 +70,16 @@ The adapter maps these fields into a generated `openclaw.json` before starting
 the Gateway. A non-empty `tools.enabled` list maps to `tools.allow`, an empty
 list maps to a wildcard `tools.deny` policy, and `tools.blocked` maps to
 `tools.deny`. It uses a generated one-time token, loopback binding, and an
-isolated temporary OpenClaw state directory. The Gateway is stopped and its
-temporary configuration is removed when the NeMo Fabric runtime stops.
+isolated temporary OpenClaw state directory, or the agent's state folder with
+`runtime.keep_state`. The Gateway is stopped and its temporary configuration is
+removed when the NeMo Fabric runtime stops; a kept state folder is never
+removed.
+
+Each `skills.paths` entry is a skill or a folder of skills, as
+[Load Skills from Folders](../../../docs/integrations/harness/skills.mdx)
+describes. Start fails with `openclaw_skill_not_found` for a missing entry and
+`openclaw_skill_invalid` for the other failures. The adapter passes each skill
+folder to OpenClaw's `skills.load.extraDirs`.
 
 For custom OpenAI-compatible providers, set `models.<role>.base_url`; the
 adapter generates an OpenClaw custom provider using the
@@ -107,6 +115,7 @@ The following settings are specific to the OpenClaw adapter:
 | `agent_id` | `default` | OpenClaw agent for NeMo Fabric-originated invocations. |
 | `channel_config` | None | OpenClaw-native `channels` and `bindings` for a prepared service. Every binding must target `agent_id`. Managed runtimes reject this setting. |
 | `port_range` | Random available range | Inclusive consumer-allocated range with `start` and `end` fields; it must span at least 111 ports. |
+| `interfaces.dashboard` | None | Serve the Control UI on a managed runtime, with an exact `port` and optional `enabled`; see [Serve the Control UI](../../../docs/integrations/harness/openclaw.mdx#serve-the-control-ui). |
 | `startup_timeout_seconds` | `60` | One deadline for all of start, from checking the `openclaw` command to the Gateway becoming ready; at most 75 seconds. |
 | `shutdown_timeout_seconds` | `5` | Graceful shutdown timeout. |
 | `connect_timeout_seconds` | `10` | Local HTTP connection timeout. |

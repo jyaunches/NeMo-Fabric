@@ -269,7 +269,7 @@
           "type": "object"
         },
         "paths": {
-          "description": "Skill paths resolved for the task environment.",
+          "description": "Skill paths resolved for the task environment. An entry that contains\n`SKILL.md` is one skill; otherwise each folder directly inside it that\ncontains `SKILL.md` is a skill. The OpenClaw and Hermes Agent adapters\nfollow this rule; other adapters require each entry to contain\n`SKILL.md`.",
           "items": {
             "type": "string"
           },

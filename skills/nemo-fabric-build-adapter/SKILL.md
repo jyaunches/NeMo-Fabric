@@ -117,11 +117,19 @@ adapter boundary:
   planning; `replace` discards the harness default, while `append` preserves it
   and adds the configured content after it.
 - Convert MCP servers, tool definitions, tool policy, and skills into native
-  target constructs.
+  target constructs. Each `skills.paths` entry is a skill or a folder of
+  skills, as
+  [Load Skills from Folders](https://github.com/NVIDIA/NeMo-Fabric/blob/main/docs/integrations/harness/skills.mdx)
+  describes; Python adapters can resolve them with
+  `nemo_fabric_adapter_contract.skills.resolve_skills` and pass each skill
+  folder to the harness's native skill loader.
 - Resolve workflow entry points and construction settings during `start` in
   the task environment.
 - Read identity, environment, artifacts, telemetry, and the invocation
   deadline (`deadline_millis`) from `RuntimeContext`, not from workflow settings.
+- If the adapter declares `runtime.keep_state`, keep all native state in
+  `RuntimeContext.state_dir` when it is present. Every runtime of the agent
+  receives the same folder.
 
 Reject unsupported values with stable, safe error codes. Do not log complete
 configs, environment values, headers, credentials, or arbitrary user input.

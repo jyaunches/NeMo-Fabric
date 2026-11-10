@@ -72,6 +72,12 @@ The adapter receives a normalized payload from NeMo Fabric and materializes a na
 Tool selectors are Hermes toolset names because that is the native policy
 surface Hermes exposes.
 
+Each `skills.paths` entry is a skill or a folder of skills, as
+[Load Skills from Folders](../../../docs/integrations/harness/skills.mdx)
+describes. Start fails with `hermes_skill_not_found` for a missing entry and
+`hermes_skill_invalid` for the other failures. The adapter passes each skill
+folder to Hermes Agent's `skills.external_dirs`.
+
 During run-plan resolution, NeMo Fabric Core validates the
 `models.<role>.top_p` (from 0 through 1) and positive
 `models.<role>.max_tokens` fields against the Hermes descriptor before
@@ -114,7 +120,8 @@ Hermes harness setting.
 The adapter derives Hermes state from the NeMo Fabric artifact root and creates
 a child under `runtimes/<runtime_id>`, so invocations in one NeMo Fabric runtime
 share state without sharing config or the session database with another
-runtime.
+runtime. With `runtime.keep_state`, the Hermes home is the agent's state folder
+instead; see the [Hermes Agent guide](../../../docs/integrations/harness/hermes.mdx).
 
 ## Execution Model
 

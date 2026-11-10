@@ -55,7 +55,7 @@ needs and applies it.
 | `models` | Named model roles with provider, model, credential-variable name, endpoint, temperature, and provider settings. |
 | `instructions` | Portable target instructions. |
 | `runtime` | Target-applied behavior, such as a turn limit. |
-| `skills` | Skill paths resolved for the execution environment. |
+| `skills` | Skill paths resolved for the execution environment. Each entry is a skill or a folder of skills. |
 | `mcp` | Named Model Context Protocol (MCP) servers, authentication metadata, headers, and effective per-server tool policy. |
 | `tools` | Named tool or tool-group definitions plus effective enabled and blocked policy. |
 | `workflow` | A registered custom-agent entry point and immutable construction settings. |
@@ -65,6 +65,14 @@ Use the canonical
 [`agent-config.schema.json`](https://github.com/NVIDIA/NeMo-Fabric/blob/main/schemas/adapter-contract/agent-config.schema.json)
 for exact fields and constraints. Python adapters can use the matching
 dependency-free dataclasses from `nemo_fabric_adapter_contract.models`.
+
+Resolve `skills.paths` during `start` in the task environment, where mounted
+skill folders exist. Python adapters can call
+`nemo_fabric_adapter_contract.skills.resolve_skills(paths, base_dir)`, which
+applies the rule in [Load Skills from Folders](../../integrations/harness/skills.mdx),
+returns each skill's name and folder, and raises `SkillPathError` with the
+failing `skills.paths[N]` field. Pass each resolved skill folder to the
+harness's native skill loader.
 
 ## To Map the Normalized Configuration
 
