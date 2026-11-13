@@ -72,6 +72,8 @@ MCP servers, instructions, turn limit, tool policy, and telemetry. The
 resolved Claude descriptor accepts only these Claude-specific
 `harness.settings` keys:
 
+The runtime starts even when some configured MCP servers cannot connect. After each turn, the adapter reads Claude Code's own MCP connection state (`get_mcp_status()`). Each result lists the configured servers that Claude Code could not use under `output.mcp.unavailable_servers`, with the server `name`, `transport`, and `reason` (`failed`, or `authentication_required` for a server that needs authentication). The adapter also writes a warning to standard error the first time a server is unavailable in a runtime. Error messages are not reported, because they can contain URLs, headers or other credentials. Servers that are still connecting are not reported. Each result reflects the current state, so a server that reconnects within the runtime leaves the report, and every new runtime connects all servers again. Invalid server configuration, such as an unsupported transport or authentication mode, still fails startup.
+
 Claude supports both `replace` and `append` system instructions. `append`
 preserves the `claude_code` preset and adds the configured content after it.
 
@@ -208,3 +210,9 @@ including credentials provided to the harness, and rejects conflicting upstream
 authorization configuration. Prompts and responses travel unencrypted. HTTPS
 remains the default, and MCP policy is unchanged. This option applies to
 Relay-enabled Codex, Claude, and Pi runs.
+
+## Startup Diagnostics
+
+When the SDK fails to connect, the existing lifecycle error metadata includes `startup_diagnostics`: fixed safe summaries of recognized native permission, model, and reasoning-effort rejections. For example, Claude Code's root/sudo restriction on `--dangerously-skip-permissions` survives startup failure without changing the configured permissions or execution user.
+
+The adapter scans at most 8,192 characters per stderr callback and retains at most one summary per recognized reason. It omits raw stderr, credential values, model IDs, prompts, and environment maps. If stderr has no recognized reason, the metadata contains an omission notice; no stderr leaves the existing error metadata unchanged. Capture ends after startup, and existing runtime journal handling remains unchanged.
